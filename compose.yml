@@ -1,0 +1,99 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: conclave-db
+    environment:
+      POSTGRES_USER: conclave
+      POSTGRES_PASSWORD: conclave
+      POSTGRES_DB: conclave
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conclave -d conclave"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  reasoningbank:
+    build: ./reasoningbank
+    container_name: reasoningbank
+    environment:
+      RB_EMBEDDING_API_BASE: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      RB_EMBEDDING_API_KEY: ${LLM_API_KEY}
+      RB_EMBEDDING_MODEL: ${RB_EMBEDDING_MODEL:-text-embedding-3-large}
+      RB_LLM_API_BASE: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      RB_LLM_API_KEY: ${LLM_API_KEY}
+      RB_LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
+      RB_RETRIEVAL_TOP_K: ${RB_RETRIEVAL_TOP_K:-3}
+      RB_SIMILARITY_THRESHOLD: ${RB_SIMILARITY_THRESHOLD:-0.30}
+      RB_DEDUP_THRESHOLD: ${RB_DEDUP_THRESHOLD:-0.85}
+      RB_DATA_DIR: /data
+      RB_LOG_LEVEL: ${RB_LOG_LEVEL:-INFO}
+    volumes:
+      - reasoningbank_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health').getcode()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: conclave-backend
+    environment:
+      DATABASE_URL: postgresql://conclave:conclave@db:5432/conclave
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
+      LLM_MAX_TOKENS: "8192"
+      LLM_TEMPERATURE: "1"
+      # --- Adaptive per-member questioning (SPEC docs/ADAPTIVE_SPEC.md §12) ---
+      ADAPTIVE_QUESTIONS_ENABLED: ${ADAPTIVE_QUESTIONS_ENABLED:-true}
+      ADAPTIVE_P_MAX_MEMBERS: ${ADAPTIVE_P_MAX_MEMBERS:-20}
+      # --- MCP research stage (SPEC docs/MCP_SPEC.md §6) ---
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_PROVIDERS: ${MCP_PROVIDERS:-}
+      MCP_RESEARCH_MODEL: ${MCP_RESEARCH_MODEL:-}
+      MCP_REQUIRED: ${MCP_REQUIRED:-false}
+      MCP_MAX_ROUNDS: ${MCP_MAX_ROUNDS:-3}
+      MCP_RESULT_CHARS: ${MCP_RESULT_CHARS:-3000}
+      MCP_TOTAL_RESULT_CHARS: ${MCP_TOTAL_RESULT_CHARS:-12000}
+      MCP_TOOL_TIMEOUT_S: ${MCP_TOOL_TIMEOUT_S:-30}
+      MCP_CONNECT_TIMEOUT_S: ${MCP_CONNECT_TIMEOUT_S:-10}
+      MCP_RUN_TIMEOUT_S: ${MCP_RUN_TIMEOUT_S:-180}
+      MCP_RESEARCH_MAX_TOKENS: ${MCP_RESEARCH_MAX_TOKENS:-1024}
+      MCP_ALLOW_OPINION_CONTEXT: ${MCP_ALLOW_OPINION_CONTEXT:-false}
+      MCP_LOG_VERBOSE: ${MCP_LOG_VERBOSE:-false}
+      # --- MCP provider credentials (only needed for the providers you enable) ---
+      # Providers are configured in mcp_config.yaml; these env vars hold the keys
+      # referenced by api_key_env there. web_search is OpenAI-native (run_openai_prompt),
+      # not routed through research_phase's session path.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}        # web_search (OpenAI-native, via run_openai_prompt)
+      APIFY_TOKEN: ${APIFY_TOKEN:-}              # apify_threads_post provider
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}  # maps provider
+      REALPING_API_KEY: ${REALPING_API_KEY:-}    # realping provider
+      # --- ReasoningBank-Lite memory sidecar ---
+      RBANK_ENABLED: ${RBANK_ENABLED:-true}
+      RBANK_BASE_URL: http://reasoningbank:8000
+    volumes: ["./backend:/app", "./mcp_config.yaml:/mcp_config.yaml:ro", "./.env:/.env:ro"]
+    ports: ["8000:8000"]
+    # --no-access-log: participant_id is a bearer token and travels in query
+    # strings (ADAPTIVE_SPEC §12.2); if access logs are ever re-enabled, a
+    # query-string-stripping logging filter MUST be added with them.
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-access-log
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: conclave-frontend
+    volumes: ["./frontend:/app", "/app/node_modules"]
+    ports: ["5173:5173"]
+    command: npm run dev -- --host 0.0.0.0
+    depends_on: [backend]
+
+volumes:
+  pgdata:
+  reasoningbank_data:

@@ -1,0 +1,14 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sse-starlette==3.4.10
+pydantic==2.13.5
+pydantic-settings==2.15.0
+asyncpg==0.31.0
+openai==3.8.0
+httpx==0.28.1
+pytest==8.3.4
+pytest-asyncio==0.24.0
+mcp[cli]==2.1.1
+python-dotenv==1.2.3
+PyYAML==6.0.3
+yahoo-finance-mcp @ git+https://github.com/Alex2Yang97/yahoo-finance-mcp@3ae895950b13eaca79e167679aec125e3ca41119

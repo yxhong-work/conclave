@@ -1,0 +1,106 @@
+output:
+  # Controls how threads(), realPing(), googleMaps(), and openaiTools() expose results.
+  # return: return a JSON string without writing to the terminal. Use this mode
+  #         when passing function-call results back to the OpenAI Responses API.
+  # print:  print the JSON string to the terminal and return None. This is useful
+  #         for manual scripts and command-line debugging.
+  # Override this setting with the MCP_OUTPUT_MODE environment variable.
+  mode: return
+
+retry:
+  empty_result_retries: 3
+
+http:
+  # Client-side timeout, in seconds, for every Apify, RealPing, and Google HTTP
+  # request. It must be greater than zero. This is separate from the maximum
+  # duration of an Apify Actor run configured below.
+  timeout: 60
+
+  # Identifies this client to upstream APIs. Keep a non-browser application
+  # name here; some API firewalls reject Python's default urllib signature.
+  user_agent: Conclave-MCP/1.0
+
+apify:
+  # Root of the Apify REST API. Change this only for a compatible proxy or a
+  # test server; do not append /v2 or a trailing slash.
+  base_url: https://api.apify.com
+
+  # Apify Actor used by threads(). Actor names use owner~actor-name format.
+  actor_id: igview-owner~threads-search-scraper
+
+  # Maximum synchronous Actor runtime in seconds. Valid range: 1-300. A larger
+  # value accommodates slower searches but keeps the HTTP connection open.
+  wait_for_finish: 30
+
+  # Maximum dataset rows returned to the caller. This controls response size;
+  # it does not guarantee that the Actor scrapes or bills for only this amount.
+  max_items: 20
+
+realping:
+  # Root of the RealPing REST API. realPing() appends the selected endpoint,
+  # such as /transactions, /area-stats, /value-check, /parking, or /usage.
+  base_url: https://api.realping.tw
+
+google_maps:
+  # Operation used when googleMaps() is called without an explicit operation.
+  # Supported values: text_search, place_details, geocode, reverse_geocode.
+  default_operation: text_search
+
+  # Number of places requested by text_search when max_results is omitted.
+  # Google Places Text Search accepts an integer from 1 through 20.
+  default_max_results: 10
+
+  # Location-bias radius in metres when coordinates are supplied without an
+  # explicit radius_m. This must be greater than zero.
+  default_radius_m: 5000
+
+  # Root of Places API (New), used for text_search and place_details.
+  places_base_url: https://places.googleapis.com/v1
+
+  # Root of the Google Geocoding API, used for geocode and reverse_geocode.
+  geocoding_base_url: https://maps.googleapis.com/maps/api
+
+  # Comma-separated Places Text Search response fields. Smaller masks usually
+  # produce smaller responses and can reduce Google Maps billing categories.
+  # Keep the places. prefix for fields on each returned place.
+  field_mask: places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,nextPageToken,searchUri
+
+  # Comma-separated Place Details response fields. Unlike Text Search fields,
+  # these fields must not use the places. prefix.
+  place_details_field_mask: id,displayName,formattedAddress,location,googleMapsUri,rating,userRatingCount,businessStatus,currentOpeningHours
+
+openai:
+  # Low-cost model used by the live integration test. It must support the
+  # Responses API, function calling, and web search. Override with OPENAI_MODEL.
+  model: gpt-5.4-nano
+
+  # Developer instructions sent to the model before it chooses or executes any
+  # selected MCP tool. openaiTools() also sends this again on continuation
+  # requests because Responses API instructions are not inherited through
+  # previous_response_id. Pass instructions=... to append request-specific
+  # guidance; set this to an empty string to disable the default.
+  default_prompt: "Choose MCP tool based on the user intent, never invent tool results, and base the final answer on returned tool data. If a tool returns no result, state that no result is available and do not invent an answer. Clearly separate tool-backed facts from inference and include source links when available."
+
+  # Native Responses API tool identifier returned by webSearch(). Use
+  # web_search for current clients. web_search_preview is retained only for a
+  # client that explicitly targets the legacy preview tool name.
+  web_search_type: web_search
+
+  # 每一輪tool use可回傳的字數，會影響最後輸出的結果
+  max_output_tokens: 4000
+
+  # 模型可以呼叫tools以及整個資訊的次數
+  max_rounds: 10
+
+  # mcp 每次可回傳的字數
+  max_tool_output_chars: 6000
+
+# Copyable user prompts demonstrating the intended purpose of each tool.
+# These values are returned by mcp_config() but are not sent automatically; the
+# calling application chooses which prompt and tool definitions to provide.
+sample_prompts:
+  threads: "Search Threads for posts about AI startups in Taiwan and summarize the main themes with links to representative posts."
+  googleMaps: "Use Google Maps text search to find five coffee shops near Taipei Main Station. Return each name, formatted address, rating, review count, and Google Maps link."
+  realPing: "Use the RealPing area-stats endpoint with 縣市 set to 臺北市 and 區 set to 大安區. Explain the sale-price median per real ping, P25, P75, and average shared-area ratio."
+  webSearch: "Search the web for the latest official announcements about Taiwan housing policy. Summarize the changes, include publication dates, and cite the original sources."
+  combined: "Research whether living near Taipei 101 is a good fit. Use Google Maps for nearby amenities, RealPing for local transaction prices, web search for current transport and policy information, and Threads for recent public sentiment. Clearly label each source and any inference."

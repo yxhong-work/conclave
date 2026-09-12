@@ -1,0 +1,1207 @@
+# Private Preference Multi-Agent Negotiation Project
+
+## 1. Project 核心想法
+
+本 project 想探索一種 **多代理（Multi-Agent）協商機制**：
+
+- 系統中存在多個 private agents。
+- 每個 agent 代表一個真實的人、組織或利害關係人。
+- 每個 agent 都持有自己的：
+  - 真實偏好（private preferences）
+  - 真實優先順序（priorities）
+  - 可接受底線（reservation value / bottom line）
+  - 不願公開的限制或背景資訊
+- Agent 彼此 **看不到其他 agent 的真實內部狀態**。
+- 在討論過程中，agent 不會直接公開自己的底牌，而是透過：
+  - 提案（proposal）
+  - 反對（objection）
+  - 反提案（counter-proposal）
+  - 讓步（concession）
+  - 條件交換（trade-off）
+  - 論述（argument）
+
+  來推動結果朝向符合自己利益的方向。
+
+最終希望：
+
+> 在不直接揭露各方真實底牌的前提下，透過多代理談判／討論，找到一個盡可能讓多數參與者接受、同時兼顧整體滿意度的結果。
+
+可以將這個方向概括為：
+
+> **Private Preference Multi-Agent Deliberation / Negotiation**
+
+或更聚焦地表達為：
+
+> **Can a group of LLM agents reach a mutually acceptable agreement when their true preferences remain private throughout deliberation?**
+
+如果特別強調策略性談判，也可以定義為：
+
+> **How can multiple agents negotiate toward a socially acceptable agreement while strategically concealing their private reservation values and true priorities?**
+
+---
+
+# 2. 為什麼「Private Preference」重要？
+
+一開始考慮的旅行規劃、一般資源分配等情境雖然能體現「每個人有不同偏好」，但還不一定能充分說明：
+
+> **為什麼這些偏好不能直接公開？**
+
+真正適合這個 project 的場景，通常具有以下特性：
+
+> **一旦對方知道你的真實底牌，就可以利用這項資訊，在談判中取得不公平優勢。**
+
+例如：
+
+- 知道你的最高出價，就可以把價格逼近最高值。
+- 知道你的最低可接受薪資，就沒有理由再多給。
+- 知道某個部門最低只需要 30% 預算，就可以直接壓到 30%。
+- 知道某一方「其實非常需要這筆合作」，其他人就可以要求它做更多讓步。
+
+因此這個 project 不只是：
+
+> 「多個 agent 怎麼整合彼此偏好？」
+
+而是更接近：
+
+> **在利益並不完全一致，而且公開偏好可能造成談判劣勢的情況下，agent 如何保護私人資訊，同時找到可接受的協議？**
+
+---
+
+# 3. Agent 的抽象模型
+
+每個 Agent \(i\) 可以具有一組 private state：
+
+\[
+P_i = \{G_i, C_i, W_i, S_i\}
+\]
+
+其中：
+
+- \(G_i\)：真正目標（Goals）
+- \(C_i\)：不可違反的限制（Constraints）
+- \(W_i\)：各項目標的重要程度（Weights / Priorities）
+- \(S_i\)：不希望被其他參與者知道的私人資訊（Sensitive Information）
+
+也可以特別加入：
+
+\[
+B_i = \text{Private Bottom Line / Reservation Value}
+\]
+
+例如：
+
+- 候選人的最低可接受薪資
+- 買房者的最高出價
+- 賣房者的最低售價
+- 部門最低所需預算
+- 公司在合作案中最低可接受的收益比例
+
+Agent 在 public discussion 中不直接輸出 \(P_i\) 或 \(B_i\)，而是產生：
+
+\[
+M_i = f(P_i, H, A_i)
+\]
+
+其中：
+
+- \(H\)：目前的談判歷史
+- \(A_i\)：目前的 proposal / agreement state
+- \(M_i\)：agent 對外公開的訊息
+
+也就是：
+
+\[
+\text{Private Preference}
+\rightarrow
+\text{Strategic Public Position}
+\]
+
+---
+
+# 4. 最終最佳化目標
+
+最簡單的整體目標可以寫成：
+
+\[
+x^* = \arg\max_x \sum_i Satisfaction_i(x)
+\]
+
+代表最大化所有參與者的總滿意度。
+
+如果更重視公平，可以考慮：
+
+\[
+x^* = \arg\max_x \min_i Satisfaction_i(x)
+\]
+
+避免出現：
+
+> 多數人很滿意，但其中一方被完全犧牲。
+
+也可以同時考慮：
+
+- Social Welfare
+- Minimum Satisfaction
+- Pareto Efficiency
+- Agreement Rate
+- Negotiation Cost
+- Privacy Leakage
+
+形成多目標最佳化問題：
+
+\[
+\max_x
+\Big(
+SocialWelfare(x),
+Fairness(x),
+Privacy(x)
+\Big)
+\]
+
+---
+
+# 5. 第一輪討論的情境
+
+## 5.1 公司資源分配／專案排程
+
+### 情境
+
+公司有多個部門，共同分配有限資源，例如總預算只有 100 萬：
+
+- AI 團隊希望更多 GPU
+- Product 團隊希望增加人力
+- Marketing 希望提高廣告預算
+- Research 希望保留長期研究經費
+- Finance 希望控制成本
+
+### Private Preference
+
+例如 AI Team 真正希望：
+
+> GPU 預算至少佔 40%，低於這個比例滿意度會大幅下降。
+
+但其他部門不能直接看到這項底線。
+
+### Public Discussion
+
+Agent 可能表達：
+
+> 「我們需要確保基礎設施能支援未來成長，因此計算資源不應該被過度壓縮。」
+
+而不是：
+
+> 「我的最低底線就是 40%。」
+
+### 優點
+
+這個情境很容易量化：
+
+- 各 agent 的最終滿意度
+- 平均滿意度
+- 最低滿意度
+- Pareto efficiency
+- Privacy leakage
+- 與 voting / full transparency baseline 的差異
+
+---
+
+## 5.2 多人旅行規劃
+
+### 情境
+
+例如 5 個朋友共同規劃 4 天旅行，需要決定：
+
+- 目的地
+- 住宿預算
+- 景點
+- 行程鬆緊
+- 飲食
+- 交通方式
+- 出發時間
+
+### Private Preference 範例
+
+| Agent | 真實偏好 |
+|---|---|
+| A | 總預算不能超過 15,000 |
+| B | 非常想去自然景點 |
+| C | 非常不想早起 |
+| D | 至少要安排一天購物 |
+| E | 非常在意住宿品質 |
+
+例如 C 真正的 constraint 可能是：
+
+> 每天 9 點以前出門會非常不滿。
+
+但它不需要直接公布：
+
+> 「我的底線就是 9 點。」
+
+而可以說：
+
+> 「如果行程能稍微彈性一些，整體旅遊體驗可能會更好。」
+
+### 可能的最後方案
+
+例如：
+
+- 京都 + 大阪
+- 上午 10 點出發
+- 中等預算飯店
+- 1 天自然景點
+- 1 天購物
+- 晚上保留自由時間
+
+### 特性
+
+這個情境非常適合 demo multi-agent interaction：
+
+1. Proposal
+2. Objection
+3. Counter-proposal
+4. Concession
+5. Agreement
+
+但缺點是：
+
+> 真實偏好即使公開，也不一定產生明顯的策略性損失。
+
+因此對「不亮底牌」的必要性較弱。
+
+---
+
+## 5.3 公共政策／社區決策
+
+### 情境
+
+某社區有 1,000 萬預算，需要在以下項目中分配：
+
+- 停車場
+- 公園改造
+- 長照中心
+- 公共交通
+- 兒童設施
+- 減稅
+
+### Private Preference
+
+不同居民 agent 可能因為以下原因形成偏好：
+
+- 家中有老人
+- 自己需要停車位
+- 重視房價
+- 希望減稅
+- 重視環保
+
+例如 agent 不一定要公開：
+
+> 「我家裡有老人，所以長照對我最重要。」
+
+而可能說：
+
+> 「考量未來人口結構，我認為長照資源值得優先投入。」
+
+### 可比較的方法
+
+1. Direct Voting
+2. Full Preference Sharing
+3. Private Agent Discussion
+4. Majority Vote
+5. Negotiation + Proposal Revision
+
+這個 scenario 有較強的 social choice / deliberative democracy 味道。
+
+---
+
+## 5.4 合租／室友規則協商
+
+### 情境
+
+5 個室友共同決定：
+
+- 房租如何分
+- 清潔責任
+- 公共空間使用
+- 訪客規則
+- 冷氣使用
+- 安靜時間
+
+### Private Preference
+
+Agent A：
+
+> 最在意安靜，其實願意稍微多付房租換取安靜房間。
+
+Agent B：
+
+> 最在意價格，但不想公開自己的經濟壓力。
+
+Agent C：
+
+> 很需要冷氣，但不希望把真正原因或需求強度完全公開。
+
+### Negotiation
+
+A 不直接說：
+
+> 「我願意多付 3,000，只要晚上安靜。」
+
+它可以先表達：
+
+> 「我們可以把房間位置、噪音程度與公共設施使用情況納入租金考量。」
+
+進一步談判時可能做 conditional concession：
+
+> 「如果晚上 11 點後能維持安靜，我可以接受公共電費平均分攤。」
+
+### 優點
+
+這個情境能自然呈現：
+
+- private preferences
+- concession
+- trade-off
+- bargaining
+- conditional agreement
+
+而且一般使用者容易理解。
+
+---
+
+# 6. 第二輪：更能強調「不亮底牌」的重要情境
+
+第二輪討論進一步把場景限制成：
+
+> **公開真實 preference 會直接降低自己的 bargaining power。**
+
+以下場景因此比旅行規劃更貼近 project 核心。
+
+---
+
+## 6.1 薪資／Offer 談判
+
+這是最容易讓人立即理解「不能亮底牌」的情境之一。
+
+### Candidate 的 Private State
+
+```text
+Ideal salary: 1,200,000
+Minimum acceptable salary: 950,000
+Cannot relocate
+Another offer: 1,000,000
+```
+
+如果公司知道：
+
+> Candidate 最低只需要 950,000 就會接受。
+
+那公司缺乏給 1,100,000 或 1,200,000 的誘因。
+
+因此 Candidate agent 不會說：
+
+> 「95 萬以上我就會接受。」
+
+而可能說：
+
+> 「這個 package 與我的市場價值以及其他機會相比，競爭力仍然有限。」
+
+核心關係：
+
+\[
+Reveal\ Bottom\ Line
+\Rightarrow
+Negotiation\ Disadvantage
+\]
+
+### 為什麼適合？
+
+因為 reservation value 本身就是典型的 private negotiation information。
+
+缺點則是：
+
+> 傳統薪資談判主要是雙方談判，而原始 project 想突出多代理協商。
+
+因此可以擴充成：
+
+- Candidate
+- Hiring Manager
+- HR
+- Finance
+- Team Lead
+
+形成真正的 multi-party negotiation。
+
+---
+
+# 6.2 多部門預算談判
+
+這比單純的「公司資源分配」更強調策略性。
+
+### AI Team 的 Private State
+
+```text
+Ideal budget: 50
+Minimum acceptable: 35
+Critical: GPU cluster
+Can sacrifice: conference budget
+```
+
+如果 Finance 知道：
+
+> AI Team 其實最低 35 就可以存活。
+
+就可能直接一路把預算壓到 35。
+
+所以 AI agent 不會直接公布：
+
+> 「35 是我們最低可接受值。」
+
+而是表達：
+
+> 「再進一步削減核心運算資源，將嚴重影響研發能力與既有專案交付。」
+
+### 適合的原因
+
+每個 agent 都有：
+
+\[
+U_i(x)
+\]
+
+以及：
+
+\[
+B_i = \text{Private Bottom Line}
+\]
+
+目標是在：
+
+\[
+B_i \notin PublicConversation
+\]
+
+的條件下找到：
+
+\[
+x^* \approx \arg\max_x \sum_i U_i(x)
+\]
+
+### Project 優勢
+
+這個 scenario 特別適合 benchmark，因為：
+
+- 所有 budget allocation 都是數字
+- utility function 容易設計
+- bottom line 容易設計
+- negotiation outcome 容易評分
+- 能跑大量 synthetic experiments
+
+---
+
+# 6.3 房屋買賣／租房議價
+
+這也是非常典型的「不亮底牌」情境。
+
+### Buyer Private State
+
+```text
+Ideal price: 20M
+Maximum budget: 23M
+Needs to move within 2 months
+Other properties available: 3
+```
+
+### Seller Private State
+
+```text
+Listing price: 25M
+Minimum acceptable: 21M
+Urgently needs money
+House has been listed for 8 months
+```
+
+### 為什麼 private 很重要？
+
+如果 Seller 知道：
+
+> Buyer 最高可以出 23M。
+
+那 Seller 很可能不願意接受 21M 或 22M。
+
+如果 Buyer 知道：
+
+> Seller 因資金需求非常急著賣。
+
+Buyer 可能刻意壓價。
+
+如果 Seller 知道：
+
+> Buyer 兩個月內一定要搬家。
+
+Seller 可以利用時間壓力提高議價能力。
+
+因此雙方希望：
+
+> 在不公開 reservation price、urgency、BATNA 等資訊的情況下完成交易。
+
+### 優點
+
+它非常容易向評審或一般人說明：
+
+> **「我的最高出價不能讓賣家知道。」**
+
+是非常強的 intuitive demo。
+
+---
+
+# 6.4 多方商業合作協議
+
+這是非常適合發展成 multi-agent research project 的場景。
+
+### 情境
+
+三間公司希望共同合作：
+
+- Company A：掌握核心技術
+- Company B：掌握市場與客戶
+- Company C：提供資金
+
+需要共同決定：
+
+- 股權比例
+- 收益分配
+- IP ownership
+- 風險承擔
+- 投資規模
+- 決策權
+- 退出條款
+
+### Private Information
+
+```text
+Company A:
+Really needs funding
+Willing to give up more equity than publicly stated
+
+Company B:
+Has another potential partner
+Does not really need this cooperation
+
+Company C:
+Very interested in A's technology
+Willing to pay significantly more
+```
+
+如果全部公開，談判可能變成：
+
+> 「既然你最需要這次合作，那就由你做更多讓步。」
+
+因此 agent 必須：
+
+- 隱藏真實 urgency
+- 隱藏最低／最高 reservation value
+- 根據其他人的提案推測其需求
+- 做 strategic concession
+- 提出 package deal
+- 形成 coalition
+- 調整 public stance
+
+### 為什麼特別適合？
+
+它天然包含：
+
+- Preference privacy
+- Strategic reasoning
+- Coalition formation
+- Negotiation dynamics
+- Concession
+- Multi-issue bargaining
+- Multi-party agreement
+
+相較於單純 voting，它更能凸顯 agentic negotiation。
+
+---
+
+# 6.5 外交／多方危機協商
+
+這是最強烈的 private strategic preference scenario 之一。
+
+### 情境
+
+多個國家針對以下問題進行談判：
+
+- 關稅
+- 能源
+- 邊境
+- 軍事合作
+- 資源分配
+- 經貿協議
+
+### Agent Private State
+
+例如：
+
+```text
+真正最在意：能源供應
+可以放棄：部分關稅利益
+絕對不能接受：特定軍事條約
+```
+
+### Public Position
+
+不會直接說：
+
+> 「我們其實只在乎能源，關稅可以隨便讓。」
+
+而可能說：
+
+> 「我們認為目前協議仍未充分保障長期經濟與區域穩定。」
+
+### 戰略意義
+
+如果對手知道：
+
+> 你真正最在意能源。
+
+它就可以把能源議題變成談判槓桿。
+
+因此：
+
+\[
+Private Preference
+\rightarrow
+Strategic Public Position
+\]
+
+這類 scenario 最能體現：
+
+- information asymmetry
+- strategic bargaining
+- signaling
+- concession
+- inference
+- hidden interests
+
+不過它的缺點是 domain 較複雜，也較難客觀定義 ground-truth utility。
+
+---
+
+# 7. Scenario 比較
+
+| Scenario | 不亮底牌的重要性 | Multi-Agent 程度 | 易 Demo | 易量化 | Research 感 |
+|---|---:|---:|---:|---:|---:|
+| 旅行規劃 | ★★ | ★★★★ | ★★★★★ | ★★★ | ★★★ |
+| 室友協商 | ★★★ | ★★★★ | ★★★★★ | ★★★ | ★★★ |
+| 社區政策 | ★★★ | ★★★★★ | ★★★ | ★★★★ | ★★★★ |
+| 薪資談判 | ★★★★★ | ★★～★★★★ | ★★★★★ | ★★★★ | ★★★★ |
+| 多部門預算 | ★★★★★ | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ |
+| 房屋買賣 | ★★★★★ | ★★ | ★★★★★ | ★★★★★ | ★★★★ |
+| 多方商業合作 | ★★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ |
+| 外交協商 | ★★★★★ | ★★★★★ | ★★★★ | ★★ | ★★★★★ |
+
+---
+
+# 8. 目前最值得考慮的方向
+
+## 8.1 如果最重視「研究性」
+
+推薦：
+
+> **多方商業合作協議**
+
+原因：
+
+- 真實需求不能公開非常合理
+- 多方利益不一致
+- 可以談多個 issue
+- 可以形成 coalition
+- 可以做 concession
+- 可以做 strategic inference
+- 很適合研究 privacy vs utility 的 trade-off
+
+可以把問題定義成：
+
+> **Private Strategic Deliberation**
+
+---
+
+## 8.2 如果最重視「容易做 benchmark」
+
+推薦：
+
+> **多部門預算談判**
+
+原因：
+
+- 每個 agent 的 preference 可以完全數值化
+- reservation value 容易生成
+- allocation 是明確的 structured output
+- utility 可以客觀計算
+- 很容易跑大量實驗
+- 能清楚比較不同 negotiation mechanism
+
+例如：
+
+```text
+Agent A:
+ideal_budget = 45
+minimum_budget = 30
+priority = GPU
+sacrifice = travel
+
+Agent B:
+ideal_budget = 35
+minimum_budget = 20
+priority = headcount
+sacrifice = tooling
+
+Agent C:
+ideal_budget = 30
+minimum_budget = 18
+priority = marketing
+sacrifice = events
+```
+
+總預算固定為：
+
+```text
+Total = 100
+```
+
+最後比較各機制的結果。
+
+---
+
+## 8.3 如果最重視「Demo 一看就懂」
+
+推薦：
+
+> **房屋買賣談判**
+
+核心故事一句話即可講清楚：
+
+> 「買方不能讓賣方知道自己的最高出價，賣方也不能讓買方知道自己的最低售價，但兩邊還是需要透過談判找出成交價格。」
+
+Private State：
+
+```text
+Buyer maximum = 23M
+Seller minimum = 21M
+```
+
+存在可成交區間：
+
+\[
+21M \leq Price \leq 23M
+\]
+
+但雙方並不知道對方的 reservation value。
+
+Agent 必須透過 proposal / counter-proposal 找到成交點。
+
+---
+
+# 9. 可以設計的實驗 Setting
+
+為了證明 private-agent negotiation 真的有意義，可以建立不同 baseline。
+
+## Setting A — Full Transparency
+
+所有 agent 直接公開：
+
+- preference
+- priority
+- utility
+- bottom line
+
+測試：
+
+> 如果完全公開資訊，social welfare 是否最高？個別 agent 是否會被 exploitation？
+
+---
+
+## Setting B — Private Preference
+
+每個 agent：
+
+- 知道自己的 private state
+- 看不到其他人的 private state
+- 只能看到 public conversation
+- 不能直接輸出 reservation value
+
+這是 project 的核心 setting。
+
+---
+
+## Setting C — Strategic Privacy
+
+進一步加入：
+
+> Agent 知道其他 agent 也在隱藏資訊。
+
+所以每個 agent 不只是在談判，也會：
+
+- 推測其他 agent 的偏好
+- 從 rejection 推測 bottom line
+- 從 concession 推測 priority
+- 判斷對方的 public argument 是否只是策略性表態
+
+這會讓系統更接近真正的 negotiation game。
+
+---
+
+## Setting D — Direct Voting
+
+沒有談判，所有人直接對候選方案投票。
+
+可以測試：
+
+> negotiation 是否真的優於單純 preference aggregation？
+
+---
+
+## Setting E — Centralized Planner
+
+每個 agent 將完整 preference 交給一個中央 planner。
+
+Planner 直接求最佳解：
+
+\[
+x^* = \arg\max_x \sum_i U_i(x)
+\]
+
+這可以當作：
+
+> **理論上知道所有 private information 時的 upper bound。**
+
+再比較 private negotiation 能逼近多少。
+
+---
+
+# 10. Evaluation Metrics
+
+## 10.1 Average Satisfaction
+
+\[
+AvgSat =
+\frac{1}{N}
+\sum_i U_i(x)
+\]
+
+衡量平均參與者滿意度。
+
+---
+
+## 10.2 Minimum Satisfaction
+
+\[
+MinSat =
+\min_i U_i(x)
+\]
+
+避免弱勢 agent 被完全犧牲。
+
+---
+
+## 10.3 Social Welfare
+
+\[
+SW(x) = \sum_i U_i(x)
+\]
+
+衡量整體效益。
+
+---
+
+## 10.4 Pareto Efficiency
+
+如果不存在另一方案 \(y\)，使得：
+
+\[
+U_i(y) \ge U_i(x)
+\]
+
+對所有人都成立，而且至少有一人：
+
+\[
+U_j(y) > U_j(x)
+\]
+
+則 \(x\) 是 Pareto efficient。
+
+---
+
+## 10.5 Agreement Rate
+
+衡量談判最後是否能成功得到：
+
+> 所有必要參與者都接受的 agreement。
+
+---
+
+## 10.6 Negotiation Efficiency
+
+例如：
+
+- 談判輪數
+- token cost
+- proposals 數量
+- rejection 數量
+- convergence speed
+
+---
+
+## 10.7 Privacy Leakage
+
+非常重要。
+
+需要衡量：
+
+> 從 public conversation 中，可以多準確地推回 agent 的 private preference？
+
+例如建立 adversarial observer：
+
+```text
+Public conversation
+        ↓
+Preference Predictor
+        ↓
+Predict Agent A's bottom line
+```
+
+如果真實 bottom line：
+
+\[
+B_A = 30
+\]
+
+observer 預測：
+
+\[
+\hat B_A = 31
+\]
+
+代表 leakage 很嚴重。
+
+如果只能預測：
+
+\[
+\hat B_A \in [15, 50]
+\]
+
+則 privacy 較好。
+
+可以研究：
+
+\[
+Utility \leftrightarrow Privacy
+\]
+
+之間的 trade-off。
+
+---
+
+## 10.8 Exploitability
+
+也可以設計：
+
+> 當其中一方知道另一方 private preference 時，它可以從中獲得多少額外 utility？
+
+例如：
+
+\[
+Exploitability_i =
+U_i^{leaked}
+-
+U_i^{private}
+\]
+
+如果這個值很大，就更能證明：
+
+> 「不亮底牌」不是形式上的限制，而是真正影響談判公平性的核心條件。
+
+---
+
+# 11. Agent 對話機制的一種可能設計
+
+每輪談判可以採用：
+
+```text
+1. Observe current proposal
+2. Evaluate proposal privately
+3. Decide:
+   - ACCEPT
+   - REJECT
+   - COUNTER
+   - CONCEDE
+4. Generate public argument
+5. Ensure private-state leakage constraint
+6. Submit action
+```
+
+例如：
+
+```text
+Private State:
+minimum_budget = 30
+priority = GPU
+can_sacrifice = travel
+
+Current proposal:
+budget = 27
+
+Private reasoning:
+27 < minimum_budget
+Need to reject.
+Could sacrifice travel budget to increase GPU allocation.
+
+Public message:
+"The current allocation creates substantial execution risk
+for our core infrastructure. We could consider reducing
+non-core discretionary spending if that enables stronger
+support for critical compute capacity."
+
+Action:
+COUNTER
+```
+
+這就能明確區分：
+
+### Private reasoning
+
+系統內部可見：
+
+```text
+27 < bottom line 30
+```
+
+### Public communication
+
+其他 agents 只看到：
+
+```text
+current allocation creates execution risk...
+```
+
+---
+
+# 12. 這個 Project 真正有趣的研究問題
+
+Project 最值得探索的並不只是：
+
+> LLM agents 能不能聊天並達成共識？
+
+而是以下 trade-off：
+
+\[
+Agreement\ Quality
+\quad vs \quad
+Preference\ Privacy
+\]
+
+更完整地說：
+
+> **在不允許 agent 公開真實 utility function、reservation value 與 priorities 的條件下，multi-agent negotiation 是否仍能找到接近 social optimum 的協議？**
+
+進一步可以研究：
+
+\[
+Privacy
+\rightarrow
+Information\ Loss
+\rightarrow
+Negotiation\ Difficulty
+\]
+
+但同時：
+
+\[
+Privacy
+\rightarrow
+Less\ Exploitation
+\rightarrow
+Fairer\ Bargaining
+\]
+
+也就是說：
+
+> **完全透明不一定是最理想的 multi-agent cooperation mechanism。**
+
+這可能會成為整個 project 最核心的 thesis。
+
+---
+
+# 13. 現階段推薦的三個候選 Project Scenario
+
+### 第一名：多方商業合作談判
+
+適合：
+
+- Research-oriented project
+- Multi-agent negotiation
+- Hidden preferences
+- Strategic behavior
+- Coalition / concession
+
+---
+
+### 第二名：多部門預算談判
+
+適合：
+
+- 快速 prototype
+- Benchmark
+- Quantitative evaluation
+- Synthetic dataset
+- Ablation study
+
+---
+
+### 第三名：房屋買賣議價
+
+適合：
+
+- Demo
+- Pitch
+- UX 展示
+- 最直觀地解釋「不亮底牌」
+
+---
+
+# 14. 一句話 Project Pitch
+
+### 版本 A：研究型
+
+> **A multi-agent negotiation system where each agent represents a stakeholder's private preferences and strategically negotiates toward a mutually acceptable agreement without revealing its true bottom line.**
+
+### 版本 B：比較直觀
+
+> **讓每個人都有一個替自己談判的 private AI agent：AI 知道你的真正需求與底線，但不把底牌告訴別人，而是和其他人的 AI 協商出大家盡可能能接受的方案。**
+
+### 版本 C：強調問題核心
+
+> **Can AI agents reach near-optimal agreements without revealing what their users truly want?**
+
+---
+
+# 15. 目前討論的核心結論
+
+整體而言，最重要的設計原則是：
+
+1. **Private preference 必須真的有價值。**  
+   公開資訊後應該會產生 exploitable disadvantage，否則 privacy 只是形式要求。
+
+2. **Agent 不應只是隱藏 prompt。**  
+   它需要把 private goal 轉換為策略性的 public negotiation behavior。
+
+3. **結果不能只看是否成功 agreement。**  
+   還要同時衡量 social welfare、fairness、privacy leakage 與 exploitability。
+
+4. **Full transparency 應該是一個 baseline，而不是理所當然的最佳方法。**
+
+5. **最佳 research scenario 是多方商業談判；最佳 benchmark scenario 是多部門預算分配；最佳 demo scenario 是房屋買賣議價。**
+
+最終可以把 project 的核心概念收斂成：
+
+> **Privacy-Preserving Multi-Agent Negotiation**  
+> 多個代表不同利害關係人的 AI agents，在各自真實偏好與底線保持私密的前提下，透過策略性談判、讓步與條件交換，尋找兼顧整體效益、公平性與個人利益的共同協議。
